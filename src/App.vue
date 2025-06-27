@@ -1,12 +1,12 @@
 <script setup>
-import { main } from './work.js'
+import { main } from '@/work.js'
 import { i18n, ITEM_TYPES } from './data.js'
 
 import SelectEnchantments from './components/SelectEnchantments.vue'
 import ResultPanel from './components/ResultPanel.vue'
 
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { CirclePlus, Delete } from '@element-plus/icons-vue'
+import { Picture as IconPicture, CirclePlus, Delete } from '@element-plus/icons-vue'
 
 const isNarrow = ref(false)
 function handleResize() {
@@ -24,11 +24,18 @@ const mode = ref('xp')
 const useBedrock = ref(false)
 const compatibleCheckEachItem = ref(true)
 
+const highlightedId = ref(null)
+
+function getIconUrl(iconName) {
+  return new URL(`./assets/${iconName}.png`, import.meta.url).href
+}
+
 const itemType = ref('helmet')
+let id = 0
 const input = ref([
-  { name: 'item', ench: [] },
-  { name: 'book', ench: [] },
-  { name: 'book', ench: [] },
+  { name: 'item', ench: [], id: id++ },
+  { name: 'book', ench: [], id: id++ },
+  { name: 'book', ench: [], id: id++ },
 ])
 
 const resultStatusArr = ref([
@@ -42,6 +49,7 @@ function onEnchantStatus(idx, status) {
 }
 
 const disableUpdateResult = computed(() => resultStatusArr.value.some((s) => s.disable))
+
 const errorMsg = computed(() => {
   const first = resultStatusArr.value.find((s) => s.disable)
   if (!first) return ''
@@ -54,8 +62,8 @@ function addBook() {
   input.value.push({
     name: 'book',
     ench: [],
+    id: id++,
   })
-  resultStatusArr.value.push({ disable: false, reason: '' })
 }
 function removeBook(idx) {
   if (input.value.filter((i) => i.name === 'book').length > 1) {
@@ -67,7 +75,7 @@ function removeBook(idx) {
 const result = ref([])
 function updateResult() {
   const arr = input.value.map((i) => {
-    const obj = { name: i.name }
+    const obj = { name: i.name, id: i.id }
     i.ench
       .filter((e) => e.name)
       .forEach((e) => {
@@ -87,13 +95,42 @@ function updateResult() {
     <el-aside
       :width="isNarrow ? '100%' : '28em'"
       :style="isNarrow ? 'min-width:0;width:100%;max-width:100%;' : ''"
-      style="background: #f9f9f9"
     >
       <el-space fill wrap direction="vertical" style="width: 100%">
-        <el-card shadow="hover">
-          <template #header>
-            <el-select v-model="itemType">
-              <el-option v-for="type in ITEM_TYPES" :key="type" :label="i18n[type]" :value="type" />
+        <el-card
+          shadow="hover"
+          :id="'item' + input[0].id"
+          :class="[
+            'itemSelection',
+            'item' + input[0].id,
+            { highlight: highlightedId === input[0].id },
+          ]"
+          style="margin-top: 1.5em"
+        >
+          <template #header class="itembox-header">
+            <el-select :show-arrow="false" :offset="0" v-model="itemType">
+              <template #label="{ label, value }">
+                <span style="margin-left: 0.75em; margin-right: 1.5em; margin-bottom: 1.5em">
+                  <el-image :src="getIconUrl(value)" alt="item" class="pixelated">
+                    <template #error>
+                      <div class="image-slot">
+                        <el-icon><icon-picture /></el-icon>
+                      </div>
+                    </template>
+                  </el-image>
+                  <span>{{ i18n[label] }}</span>
+                </span>
+              </template>
+              <el-option v-for="type in ITEM_TYPES" :key="type" :value="type">
+                <el-image :src="getIconUrl(type)" alt="item" class="pixelated">
+                  <template #error>
+                    <div class="image-slot">
+                      <el-icon><icon-picture /></el-icon>
+                    </div>
+                  </template>
+                </el-image>
+                {{ i18n[type] }}
+              </el-option>
             </el-select>
           </template>
           <SelectEnchantments
@@ -105,19 +142,27 @@ function updateResult() {
             @status="onEnchantStatus(0, $event)"
           />
         </el-card>
-        <el-card v-for="(book, idx) in input.slice(1)" :key="idx" shadow="hover">
+        <el-card
+          v-for="(book, idx) in input.slice(1)"
+          :key="idx"
+          :id="'item' + book.id"
+          :class="['itemSelection', 'item' + book.id, { highlight: highlightedId === book.id }]"
+          shadow="hover"
+        >
           <template #header>
-            <span>{{ i18n.book }}{{ idx + 1 }}</span>
-            <el-button
-              style="float: right"
-              color="red"
-              @click="removeBook(idx + 1)"
-              :disabled="input.length <= 2"
-              :icon="Delete"
-              plain
-              alt="{{ i18n.removeBook }}"
-              size="small"
-            />
+            <div class="itembox-header" style="margin-left: 0.75em; font-size: 14px">
+              {{ i18n.book }}{{ idx + 1 }}
+              <el-button
+                style="margin-left: auto"
+                color="red"
+                @click="removeBook(idx + 1)"
+                :disabled="input.length <= 2"
+                :icon="Delete"
+                plain
+                alt="{{ i18n.removeBook }}"
+                size="small"
+              />
+            </div>
           </template>
           <SelectEnchantments
             v-model:ench="book.ench"
@@ -134,35 +179,43 @@ function updateResult() {
           <el-button @click="addBook" :icon="CirclePlus">{{ i18n.addBook }}</el-button>
         </div>
       </el-row>
-      <template v-if="isNarrow">
+      <template v-show="isNarrow">
         <ResultPanel
+          :i18n="i18n"
+          :disableUpdateResult="disableUpdateResult"
+          :errorMsg="errorMsg"
+          :input="input"
+          :itemType="itemType"
+          :highlightedId="highlightedId"
           :mode="mode"
           :useBedrock="useBedrock"
           :compatibleCheckEachItem="compatibleCheckEachItem"
-          :i18n="i18n"
-          :updateResult="updateResult"
-          :disableUpdateResult="disableUpdateResult"
-          :errorMsg="errorMsg"
           :result="result"
-          @update:mode="mode = $event"
-          @update:useBedrock="useBedrock = $event"
-          @update:compatibleCheckEachItem="compatibleCheckEachItem = $event"
+          @updateResult="updateResult"
+          @update:highlightedId="(val) => (highlightedId = val)"
+          @update:mode="(val) => (mode = val)"
+          @update:useBedrock="(val) => (useBedrock = val)"
+          @update:compatibleCheckEachItem="(val) => (compatibleCheckEachItem = val)"
         />
       </template>
     </el-aside>
-    <el-main v-if="!isNarrow" style="margin-left: 1em">
+    <el-main v-show="!isNarrow" style="margin-left: 1em">
       <ResultPanel
+        :i18n="i18n"
+        :disableUpdateResult="disableUpdateResult"
+        :errorMsg="errorMsg"
+        :input="input"
+        :itemType="itemType"
+        :highlightedId="highlightedId"
         :mode="mode"
         :useBedrock="useBedrock"
         :compatibleCheckEachItem="compatibleCheckEachItem"
-        :i18n="i18n"
-        :updateResult="updateResult"
-        :disableUpdateResult="disableUpdateResult"
-        :errorMsg="errorMsg"
         :result="result"
-        @update:mode="mode = $event"
-        @update:useBedrock="useBedrock = $event"
-        @update:compatibleCheckEachItem="compatibleCheckEachItem = $event"
+        @updateResult="updateResult"
+        @update:highlightedId="(val) => (highlightedId = val)"
+        @update:mode="(val) => (mode = val)"
+        @update:useBedrock="(val) => (useBedrock = val)"
+        @update:compatibleCheckEachItem="(val) => (compatibleCheckEachItem = val)"
       />
     </el-main>
   </el-container>
@@ -189,10 +242,28 @@ function updateResult() {
     margin-top: 0.5em;
   }
 }
-.el-card {
-  --el-card-padding: 1em;
+.itembox-header {
+  padding: 0.25em;
+  display: flex;
 }
-.el-main {
+.pixelated {
+  image-rendering: pixelated;
+  width: 1.5em;
+  height: 1.5em;
+  margin-right: 0.5em;
+  vertical-align: middle;
+}
+.el-card,
+.el-main,
+.el-card__body {
   --el-card-padding: 0;
+}
+.highlight {
+  border-left: 5px var(--el-color-primary) solid !important;
+}
+.itemSelection {
+  margin-left: 1.5em;
+  margin-right: 1.5em;
+  margin-top: 0.5em;
 }
 </style>

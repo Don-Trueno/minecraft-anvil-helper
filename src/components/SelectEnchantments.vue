@@ -72,7 +72,6 @@ watch(
 )
 
 function addEnch() {
-  // emit 新数组
   emit('update:ench', [...props.ench, { id: Date.now() + Math.random(), name: '', level: 1 }])
 }
 function removeEnch(idx) {
@@ -85,7 +84,7 @@ function removeEnch(idx) {
 <template>
   <el-space fill flex wrap direction="vertical" style="width: 100%">
     <div class="enchantselection" v-for="(e, eidx) in ench" :key="e.id">
-      <el-select v-model="e.name">
+      <el-select :show-arrow="false" :offset="0" v-model="e.name">
         <el-option
           v-for="name in getAvailableEnch(ench, e.id)"
           :key="name"
@@ -99,8 +98,8 @@ function removeEnch(idx) {
       </el-select>
 
       <el-input-number
-        min="1"
-        max="5"
+        :min="1"
+        :max="5"
         v-model="e.level"
         controls-position="right"
         value-on-clear="min"

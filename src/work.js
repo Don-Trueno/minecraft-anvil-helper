@@ -1,4 +1,4 @@
-import { ENCHANTMENTS, i18n } from './data.js';
+import { ENCHANTMENTS } from './data.js';
 import { ENCHANTMENTS_OVERRIDE } from './data-bedrock.js';
 
 function getEnchantments(useBedrock) {
@@ -12,16 +12,24 @@ function getEnchWeight(name, useBedrock) {
   return ENCHANTMENTS[name].weight || 1
 }
 
-let itemId = 1;
+let itemID = 0;
+const allItems = [];
+
 function parseInput(inputArr) {
   return inputArr.map(obj => {
-    const ench = [];
-    for (const [k, v] of Object.entries(obj)) {
-      if (k === "name") continue;
-      if (!Number.isInteger(v) || v <= 0) throw new Error(`${k}'s level must be positive integer, current ${v}`);
-      ench.push({ name: k, level: v });
+    let ench = [];
+    if (Array.isArray(obj.ench)) {
+      ench = obj.ench.map(e => ({ name: e.name, level: e.level }));
+    } else {
+      for (const [k, v] of Object.entries(obj)) {
+        if (k === "name" || k === "id") continue;
+        if (!Number.isInteger(v) || v <= 0) throw new Error(`${k}'s level must be positive integer, currently ${v}`);
+        ench.push({ name: k, level: v });
+      }
     }
-    return new ItemObj(obj.name, ench, itemId++);
+    let item = new ItemObj(obj.name, ench, obj.id ?? itemID++);
+    allItems.push(item);
+    return item;
   });
 }
 
@@ -47,6 +55,7 @@ class ItemObj {
     this.totalCost = 0;
     this.operations = null;
     this.idList = [id];
+    this.id = id;
   }
   hash() {
     const enchKey = this.ench
@@ -84,6 +93,7 @@ class MergedItem extends ItemObj {
     const mergedItemName = left.name === "item" ? "item" : "book";
     super(mergedItemName, newench, -1);
     this.idList = [...left.idList, ...right.idList];
+    this.id = -1;
 
     this.penaltyCount = Math.max(left.penaltyCount, right.penaltyCount) + 1;
 
@@ -187,6 +197,7 @@ function search(items, cache = new Map(), mode = "lvl", useBedrock = false) {
       if (items[j].name === "item") continue;
       try {
         const mergedItem = new MergedItem(items[i], items[j], useBedrock);
+        allItems.push(mergedItem);
         const next = items.filter((_, idx) => idx !== i && idx !== j).concat([mergedItem]);
         const result = search(next, cache, mode, useBedrock);
         let total, stepXp = 0, stepLvl = 0;
@@ -208,7 +219,9 @@ function search(items, cache = new Map(), mode = "lvl", useBedrock = false) {
           mergedItem.operations.parent = null;
           result.operations.parent = mergedItem;
         }
-      } catch {
+      } catch (e) {
+        console.error(e);
+        continue;
       }
       cache.set(key, min);
       return min;
@@ -229,8 +242,8 @@ function collectSteps(finalNode) {
 }
 
 export function main(inputArr, mode, useBedrock) {
+  allItems.length = 0;
   try {
-    const unit = i18n[mode];
     const items = parseInput(inputArr);
 
     // 1. test and get best subsets of items
@@ -282,68 +295,45 @@ export function main(inputArr, mode, useBedrock) {
 
     // 3. process result
     const mergeResult = {
-      name: i18n[minFinalItem.name],
+      name: minFinalItem.name,
       ench: minFinalItem.ench.map(e => ({
-        name: i18n[e.name],
-        level: i18n[e.level]
+        name: e.name,
+        level: e.level
       })),
       penaltyCount: minFinalItem.penaltyCount
     };
 
     const usedIdSet = new Set(minUsedIds);
     const unusedItems = items.filter(x => !usedIdSet.has(x.idList[0])).map(x => ({
-      name: i18n[x.name],
+      name: x.name,
       ench: x.ench.map(e => ({
-        name: i18n[e.name],
-        level: i18n[e.level]
+        name: e.name,
+        level: e.level
       }))
     }));
 
     // 4. output
     const steps = collectSteps(minFinalItem);
     const mergeSteps = [];
-    let idx = 0;
     steps.forEach((step) => {
-      idx += 1;
       const left = step.operations.left;
       const right = step.operations.right;
-      const leftType = i18n[left.name];
-      const leftEnch = left.ench.length
-        ? `${i18n.leftbracket}${left.ench.map(e => `${i18n[e.name]} ${i18n[e.level]}`).join(`${i18n.comma}`)}${i18n.rightbracket}`
-        : "";
-      const leftPenalty = left.penaltyCount > 0
-        ? `${i18n.leftbracket}${i18n.penaltyCount}${left.penaltyCount}${i18n.rightbracket}`
-        : "";
-
-      const rightType = i18n[right.name];
-      const rightEnch = right.ench.length
-        ? `${i18n.leftbracket}${right.ench.map(e => `${i18n[e.name]} ${i18n[e.level]}`).join(`${i18n.comma}`)}${i18n.rightbracket}`
-        : "";
-      const rightPenalty = right.penaltyCount > 0
-        ? `${i18n.leftbracket}${i18n.penaltyCount}${right.penaltyCount}${i18n.rightbracket}`
-        : "";
-
-      let cost = 0;
-      if (mode === "xp") {
-        cost = calc_xp(step.operations.cost);
-      } else {
-        cost = step.operations.cost;
-      }
-
-      mergeSteps.push([
-        `${idx}`,
-        `${leftType}${leftEnch}${leftPenalty}`,
-        `${rightType}${rightEnch}${rightPenalty}`,
-        `${cost}${unit}`
-      ]);
+      let cost = mode === "xp" ? calc_xp(step.operations.cost) : step.operations.cost;
+      mergeSteps.push({
+        leftId: left.id,
+        rightId: right.id,
+        cost: cost
+      });
     });
 
     return [
       mergeResult,
       mergeSteps,
-      unusedItems
+      unusedItems,
+      allItems
     ];
   } catch (e) {
+    console.error(e);
     return []
   }
 }
