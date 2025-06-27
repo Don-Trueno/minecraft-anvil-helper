@@ -13,6 +13,7 @@ function handleResize() {
   isNarrow.value = window.innerWidth < 900
 }
 onMounted(() => {
+  document.title = i18n.title
   handleResize()
   window.addEventListener('resize', handleResize)
 })
