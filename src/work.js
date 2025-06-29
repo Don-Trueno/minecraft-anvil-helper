@@ -91,11 +91,10 @@ class MergedItem extends ItemObj {
     }
 
     const mergedItemName = left.name === "item" ? "item" : "book";
-    super(mergedItemName, newench, -1);
+    super(mergedItemName, newench, itemID++);
     this.idList = [...left.idList, ...right.idList];
-    this.id = -1;
 
-    this.penaltyCount = Math.max(left.penaltyCount, right.penaltyCount) + 1;
+    this.penaltyCount = Math.max(Math.max(left.penaltyCount, right.penaltyCount) + 1, 39);
 
     let rightCost = 0;
     let allIgnored = true;
@@ -242,13 +241,14 @@ function collectSteps(finalNode) {
 }
 
 export function main(inputArr, mode, useBedrock) {
+  itemID = 0;
   allItems.length = 0;
   try {
     const items = parseInput(inputArr);
 
     // 1. test and get best subsets of items
     // TODO: check enchantments compatibility across items
-    // TODO: check enchantments max level limit
+    // TODO: check and sanitize if enchantments are over max level limit
     const allSubsets = getAllSubsets(items);
 
     let testLevel = -1;
@@ -337,4 +337,3 @@ export function main(inputArr, mode, useBedrock) {
     return []
   }
 }
-

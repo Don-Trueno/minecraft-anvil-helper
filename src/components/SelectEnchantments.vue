@@ -1,10 +1,11 @@
 <script setup>
-import { i18n } from '@/data.js'
 import { ENCHANTMENTS } from '@/data.js'
 import { ENCHANTMENTS_OVERRIDE } from '@/data-bedrock.js'
 import { computed, watch } from 'vue'
 import { CirclePlus, Delete } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const props = defineProps({
   ench: { type: Array, required: true },
   itemType: { type: String, required: true },
@@ -88,15 +89,14 @@ function removeEnch(idx) {
         <el-option
           v-for="name in getAvailableEnch(ench, e.id)"
           :key="name"
-          :label="i18n[name]"
+          :label="t(name)"
           :value="name"
         >
-          <div>
-            <span>{{ i18n[name] }}</span>
-          </div>
+          <span>{{ t(name) }}</span>
         </el-option>
       </el-select>
 
+      <!-- TODO: check and sanitize if enchantments are over max level limit-->
       <el-input-number
         :min="1"
         :max="5"
@@ -111,11 +111,11 @@ function removeEnch(idx) {
         :disabled="ench.length <= minEnchCount"
         :icon="Delete"
         plain
-        alt=" {{ i18n.removeEnch }}"
+        alt=" {{ t('removeEnch')   }}"
       />
     </div>
     <div>
-      <el-button text @click="addEnch" :icon="CirclePlus">{{ i18n.addEnch }}</el-button>
+      <el-button text @click="addEnch" :icon="CirclePlus">{{ t('addEnch') }}</el-button>
     </div>
   </el-space>
 </template>

@@ -1,19 +1,22 @@
 <script setup>
 import { main } from '@/work.js'
-import { i18n, ITEM_TYPES } from './data.js'
+import { ITEM_TYPES } from './data.js'
 
 import SelectEnchantments from './components/SelectEnchantments.vue'
 import ResultPanel from './components/ResultPanel.vue'
 
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Picture as IconPicture, CirclePlus, Delete } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+import LanguageSelector from './components/LanguageSelector.vue'
 
+const { t, locale } = useI18n()
 const isNarrow = ref(false)
 function handleResize() {
   isNarrow.value = window.innerWidth < 900
 }
 onMounted(() => {
-  document.title = i18n.title
+  document.title = t('title')
   handleResize()
   window.addEventListener('resize', handleResize)
 })
@@ -28,6 +31,9 @@ const compatibleCheckEachItem = ref(true)
 const highlightedId = ref(null)
 
 function getIconUrl(iconName) {
+  if (iconName === 'book') {
+    return new URL('./assets/enchanted_book.gif', import.meta.url).href
+  }
   return new URL(`./assets/${iconName}.png`, import.meta.url).href
 }
 
@@ -54,9 +60,7 @@ const disableUpdateResult = computed(() => resultStatusArr.value.some((s) => s.d
 const errorMsg = computed(() => {
   const first = resultStatusArr.value.find((s) => s.disable)
   if (!first) return ''
-  if (first.reason === 'empty') return i18n.empty
-  if (first.reason === 'incompatible') return i18n.incompatible
-  return ''
+  return first.reason
 })
 
 function addBook() {
@@ -84,18 +88,23 @@ function updateResult() {
       })
     return obj
   })
-  result.value = main(arr, mode.value, useBedrock.value)
+  const res = main(arr, mode.value, useBedrock.value)
+  result.value = Array.isArray(res)
+    ? res.concat(Array(4 - res.length).fill(null))
+    : [{}, [], [], []]
 }
+
+const currentLocale = ref(locale.value)
 </script>
 
 <template>
   <el-header class="box">
-    <div class="page-title">{{ i18n.title }}</div>
+    <div class="page-title">{{ t('title') }}</div>
   </el-header>
   <el-container class="box">
     <el-aside
       :width="isNarrow ? '100%' : '28em'"
-      :style="isNarrow ? 'min-width:0;width:100%;max-width:100%;' : ''"
+      :style="isNarrow ? 'min-width: 0; width: 100%; max-width: 100%;' : ''"
     >
       <el-space fill wrap direction="vertical" style="width: 100%">
         <el-card
@@ -111,7 +120,7 @@ function updateResult() {
           <template #header class="itembox-header">
             <el-select :show-arrow="false" :offset="0" v-model="itemType">
               <template #label="{ label, value }">
-                <span style="margin-left: 0.75em; margin-right: 1.5em; margin-bottom: 1.5em">
+                <span style="margin-right: 1.5em; margin-bottom: 1.5em">
                   <el-image :src="getIconUrl(value)" alt="item" class="pixelated">
                     <template #error>
                       <div class="image-slot">
@@ -119,7 +128,7 @@ function updateResult() {
                       </div>
                     </template>
                   </el-image>
-                  <span>{{ i18n[label] }}</span>
+                  <span>{{ t(label) }}</span>
                 </span>
               </template>
               <el-option v-for="type in ITEM_TYPES" :key="type" :value="type">
@@ -130,7 +139,7 @@ function updateResult() {
                     </div>
                   </template>
                 </el-image>
-                {{ i18n[type] }}
+                {{ t(type) }}
               </el-option>
             </el-select>
           </template>
@@ -151,8 +160,17 @@ function updateResult() {
           shadow="hover"
         >
           <template #header>
-            <div class="itembox-header" style="margin-left: 0.75em; font-size: 14px">
-              {{ i18n.book }}{{ idx + 1 }}
+            <div class="itembox-header" style="margin-left: 0.75em">
+              <div style="display: flex; align-items: center">
+                <el-image :src="getIconUrl('book')" alt="item" class="pixelated">
+                  <template #error>
+                    <div class="image-slot">
+                      <el-icon><icon-picture /></el-icon>
+                    </div>
+                  </template>
+                </el-image>
+                <span>{{ t('book') }} {{ idx + 1 }}</span>
+              </div>
               <el-button
                 style="margin-left: auto"
                 color="red"
@@ -160,8 +178,7 @@ function updateResult() {
                 :disabled="input.length <= 2"
                 :icon="Delete"
                 plain
-                alt="{{ i18n.removeBook }}"
-                size="small"
+                alt="{{ t('removeBook') }}"
               />
             </div>
           </template>
@@ -177,12 +194,11 @@ function updateResult() {
       </el-space>
       <el-row>
         <div style="margin-left: 1em; margin-bottom: 1em; padding: 0.5em">
-          <el-button @click="addBook" :icon="CirclePlus">{{ i18n.addBook }}</el-button>
+          <el-button @click="addBook" :icon="CirclePlus">{{ t('addBook') }}</el-button>
         </div>
       </el-row>
-      <template v-show="isNarrow">
+      <template v-if="isNarrow">
         <ResultPanel
-          :i18n="i18n"
           :disableUpdateResult="disableUpdateResult"
           :errorMsg="errorMsg"
           :input="input"
@@ -200,9 +216,9 @@ function updateResult() {
         />
       </template>
     </el-aside>
-    <el-main v-show="!isNarrow" style="margin-left: 1em">
+    <el-main style="margin-left: 1em">
       <ResultPanel
-        :i18n="i18n"
+        v-if="!isNarrow"
         :disableUpdateResult="disableUpdateResult"
         :errorMsg="errorMsg"
         :input="input"
@@ -220,6 +236,16 @@ function updateResult() {
       />
     </el-main>
   </el-container>
+  <el-footer class="box">
+    <div style="display: flex">
+      <el-link href="https://github.com/Don-Trueno/minecraft-anvil-helper"> Source Code </el-link>
+      <LanguageSelector
+        :currentLocale="currentLocale"
+        @update:currentLocale="(val) => (currentLocale = val)"
+        style="margin-left: auto"
+      />
+    </div>
+  </el-footer>
 </template>
 
 <style scoped>
@@ -235,6 +261,7 @@ function updateResult() {
   margin-top: 1em;
   box-shadow: var(--el-border-color) 0 0 10px;
   height: auto;
+  min-height: 3em;
 }
 @media (max-width: 900px) {
   .box {
