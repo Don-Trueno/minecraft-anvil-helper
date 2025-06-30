@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import vueDevTools from 'vite-plugin-vue-devtools'
+import topLevelAwait from 'vite-plugin-top-level-await';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -11,6 +12,10 @@ export default defineConfig({
     vue(),
     vueJsx(),
     vueDevTools(),
+    topLevelAwait({
+      promiseExportName: '__tla',
+      promiseImportName: (i) => `__tla_${i}`,
+    }),
   ],
   resolve: {
     alias: {
