@@ -12,6 +12,14 @@ function getEnchWeight(name, useBedrock) {
   return ENCHANTMENTS[name].weight || 1
 }
 
+export function getLevelLimit(name, useBedrock) {
+  const ENCHANTMENTS = getEnchantments(useBedrock)
+  if (!ENCHANTMENTS[name]) {
+    return 1
+  }
+  return ENCHANTMENTS[name].max_level || 1
+}
+
 let itemID = 0;
 const allItems = [];
 
@@ -94,7 +102,7 @@ class MergedItem extends ItemObj {
     super(mergedItemName, newench, itemID++);
     this.idList = [...left.idList, ...right.idList];
 
-    this.penaltyCount = Math.max(Math.max(left.penaltyCount, right.penaltyCount) + 1, 39);
+    this.penaltyCount = Math.min(Math.max(left.penaltyCount, right.penaltyCount) + 1, 39);
 
     let rightCost = 0;
     let allIgnored = true;
@@ -184,7 +192,7 @@ function search(items, cache = new Map(), mode = "lvl", useBedrock = false) {
     if (mode === "xp") {
       return { total: items[0].totalXp || 0, operations: items[0] };
     } else {
-      return { total: items[0].totalCost, operations: items[0] };
+      return { total: items[0].totalCost || 0, operations: items[0] };
     }
   }
   const key = stateKey(items);
@@ -196,6 +204,11 @@ function search(items, cache = new Map(), mode = "lvl", useBedrock = false) {
       if (items[j].name === "item") continue;
       try {
         const mergedItem = new MergedItem(items[i], items[j], useBedrock);
+        for (const ench of mergedItem.ench) {
+          if (ench.level > getLevelLimit(ench.name, useBedrock)) {
+            throw new Error("Enchantment level exceeds limit");
+          }
+        }
         allItems.push(mergedItem);
         const next = items.filter((_, idx) => idx !== i && idx !== j).concat([mergedItem]);
         const result = search(next, cache, mode, useBedrock);
@@ -219,7 +232,7 @@ function search(items, cache = new Map(), mode = "lvl", useBedrock = false) {
           result.operations.parent = mergedItem;
         }
       } catch (e) {
-        console.error(e);
+        //sconsole.error(e);
         continue;
       }
       cache.set(key, min);
@@ -248,7 +261,6 @@ export function main(inputArr, mode, useBedrock) {
 
     // 1. test and get best subsets of items
     // TODO: check enchantments compatibility across items
-    // TODO: check and sanitize if enchantments are over max level limit
     const allSubsets = getAllSubsets(items);
 
     let testLevel = -1;
@@ -282,7 +294,7 @@ export function main(inputArr, mode, useBedrock) {
     let minSubset = null;
     for (const subset of testSets) {
       const result = search(subset, new Map(), mode, useBedrock);
-      if (!result || !result.operations) continue;
+      if (result === undefined || !result || !result.operations) continue;
       let cost = mode === 'xp' ? result.total : result.total;
       if (cost < minCost) {
         minCost = cost;

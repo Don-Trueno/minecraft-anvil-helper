@@ -1,6 +1,7 @@
 <script setup>
 import { ENCHANTMENTS } from '@/data.js'
 import { ENCHANTMENTS_OVERRIDE } from '@/data-bedrock.js'
+import { getLevelLimit } from '@/work'
 import { computed, watch } from 'vue'
 import { CirclePlus, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
@@ -80,6 +81,23 @@ function removeEnch(idx) {
   newArr.splice(idx, 1)
   emit('update:ench', newArr)
 }
+
+watch(
+  () => props.ench.map((e) => e.name),
+  (newNames, oldNames) => {
+    const newArr = props.ench.map((e, idx) => {
+      let limit = getLevelLimit(e.name, props.useBedrock)
+      if (newNames[idx] !== oldNames?.[idx] || (e.name && e.level > limit)) {
+        return { ...e, level: limit }
+      }
+      return e
+    })
+    if (JSON.stringify(newArr) !== JSON.stringify(props.ench)) {
+      emit('update:ench', newArr)
+    }
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -96,10 +114,9 @@ function removeEnch(idx) {
         </el-option>
       </el-select>
 
-      <!-- TODO: check and sanitize if enchantments are over max level limit-->
       <el-input-number
         :min="1"
-        :max="5"
+        :max="e.name ? getLevelLimit(e.name, props.useBedrock) : 5"
         v-model="e.level"
         controls-position="right"
         value-on-clear="min"
